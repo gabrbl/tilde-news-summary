@@ -94,6 +94,25 @@ body {
   opacity: 0.9;
 }
 
+.app-nav {
+  margin-top: 0.75rem;
+}
+
+.secondary-link {
+  display: inline-block;
+  padding: 0.5rem 1.25rem;
+  background: rgba(255, 255, 255, 0.18);
+  color: #f7fafc;
+  border-radius: 999px;
+  font-weight: 600;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.secondary-link:hover {
+  background: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+
 .app-main {
   padding: 0;
   flex: 1;

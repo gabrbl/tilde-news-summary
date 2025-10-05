@@ -13,6 +13,7 @@ Aplicación web construida con Next.js 15 que permite buscar titulares recientes
 - [Variables de entorno](#variables-de-entorno)
 - [Puesta en marcha](#puesta-en-marcha)
 - [Colección Postman](#colección-postman)
+- [Explorador de acciones](#explorador-de-acciones)
 - [Endpoints disponibles](#endpoints-disponibles)
 - [Flujo de datos](#flujo-de-datos)
 - [Buenas prácticas y comprobaciones](#buenas-prácticas-y-comprobaciones)
@@ -25,6 +26,7 @@ Aplicación web construida con Next.js 15 que permite buscar titulares recientes
 - **Resumen automatizado** con OpenAI (opcional) que condensa los títulos más repetidos en un único párrafo informativo.
 - **Gestión de errores** clara, mostrando mensajes diferenciados para problemas de validación, límites de la API o conectividad.
 - **Experiencia en tiempo real**: los resultados se obtienen directamente desde Google News al momento de la consulta.
+- **Explorador bursátil** con gráficos interactivos y datos históricos diarios provistos por Alpha Vantage.
 
 ## Stack tecnológico
 
@@ -32,6 +34,8 @@ Aplicación web construida con Next.js 15 que permite buscar titulares recientes
 - [Axios](https://axios-http.com/) para llamadas HTTP desde el cliente y el servidor.
 - [xml2js](https://www.npmjs.com/package/xml2js) para transformar el feed RSS en objetos JavaScript.
 - [OpenAI Node SDK v4](https://github.com/openai/openai-node) para el resumen automatizado (modelos GPT-4o mini).
+- [Chart.js](https://www.chartjs.org/) + [react-chartjs-2](https://react-chartjs-2.js.org/) para la renderización de gráficos bursátiles.
+- [Alpha Vantage](https://www.alphavantage.co/documentation/) como fuente de datos históricos de acciones.
 - Estilos con CSS modular (`NewsSearch.css`) y tipografía global definida en `globals.css`.
 
 ## Estructura del proyecto
@@ -44,9 +48,13 @@ app/
     route.ts        # Índice de la API con información general
     health/route.ts # Endpoint de health-check
     news/route.ts   # Endpoint que consulta Google News RSS y opcionalmente OpenAI
+    stocks/route.ts # Endpoint que obtiene precios diarios desde Alpha Vantage
 components/
   NewsSearch.tsx    # Componente principal del buscador con lógica de UI
   NewsSearch.css    # Estilos específicos del componente
+  StockExplorer.tsx # Página interactiva para explorar acciones y gráficos
+  StockExplorer.css # Estilos del explorador de acciones
+app/stocks/page.tsx # Página principal del explorador bursátil
 services/
   newsService.ts    # Cliente Axios que consume la API desde el frontend
 ```
@@ -78,6 +86,12 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
 
 # Tiempo máximo de espera (ms) para las solicitudes desde el cliente
 NEXT_PUBLIC_API_TIMEOUT=15000
+
+# API key gratuita de Alpha Vantage (https://www.alphavantage.co/support/#api-key)
+ALPHA_VANTAGE_API_KEY=tu_api_key
+
+# (Opcional) timeout en ms al consumir Alpha Vantage desde el backend
+STOCKS_API_TIMEOUT=10000
 ```
 
 > Si `OPENAI_API_KEY` no está definido, la aplicación seguirá funcionando; simplemente omitirá el resumen automatizado.
@@ -114,6 +128,13 @@ NEXT_PUBLIC_API_TIMEOUT=15000
 - Archivo: `postman/tilde-news-api.postman_collection.json`.
 - Importa la colección en Postman y ajusta la variable `baseUrl` según tu entorno (por defecto `http://localhost:3000`).
 - Incluye requests listos para `/api`, `/api/health` y `/api/news` (búsquedas por días y por fecha exacta).
+
+## Explorador de acciones
+
+- Página disponible en `/stocks` con buscador de ticker, selector de periodo (1M, 3M, 6M, 1Y o máximo disponible) y gráfico lineal de precios de cierre diarios.
+- Requiere configurar `ALPHA_VANTAGE_API_KEY` (plan gratuito con hasta 5 solicitudes por minuto y 500 por día). Si se supera el límite, la UI mostrará un mensaje de espera.
+- La API interna `/api/stocks` normaliza la respuesta de Alpha Vantage y expone datos listos para graficar: fecha, apertura, cierre, máximos, mínimos y volumen.
+- Incluye tabla de los últimos 10 días y resaltado del último precio de cierre para facilitar el análisis rápido.
 
 ## Endpoints disponibles
 
