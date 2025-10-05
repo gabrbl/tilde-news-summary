@@ -1,0 +1,138 @@
+{
+  "info": {
+    "name": "Tilde News API",
+    "description": "Colección para probar los endpoints de la API de Tilde News (Next.js). Incluye ejemplos de salud, metadatos y búsquedas sobre Google News RSS.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "API Root",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api"
+          ]
+        },
+        "description": "Devuelve metadatos generales del servicio y los endpoints disponibles."
+      },
+      "response": []
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        },
+        "description": "Verifica el estado del servicio. Útil para monitoreo o pipelines."
+      },
+      "response": []
+    },
+    {
+      "name": "Buscar noticias (últimos días)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/news?query=YPF&days=7&limit=5",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "news"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": "YPF",
+              "description": "Término de búsqueda principal"
+            },
+            {
+              "key": "days",
+              "value": "7",
+              "description": "Ventana de tiempo en días (ignorado si se envía date)"
+            },
+            {
+              "key": "limit",
+              "value": "5",
+              "description": "Cantidad máxima de resultados a retornar"
+            },
+            {
+              "key": "language",
+              "value": "es-419",
+              "disabled": true,
+              "description": "Código de idioma/locale para Google News"
+            },
+            {
+              "key": "country",
+              "value": "AR",
+              "disabled": true,
+              "description": "Código de país para Google News"
+            }
+          ]
+        },
+        "description": "Obtiene noticias recientes basadas en un término de búsqueda y una ventana de días."
+      },
+      "response": []
+    },
+    {
+      "name": "Buscar noticias (fecha específica)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/news?query=inflacion%20argentina&date=2025-10-01&limit=5",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "news"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": "inflacion argentina",
+              "description": "Término de búsqueda principal"
+            },
+            {
+              "key": "date",
+              "value": "2025-10-01",
+              "description": "Fecha específica en formato YYYY-MM-DD"
+            },
+            {
+              "key": "limit",
+              "value": "5",
+              "description": "Cantidad máxima de resultados a retornar"
+            }
+          ]
+        },
+        "description": "Consulta noticias para una fecha exacta. Recuerda no combinar 'date' y 'days'."
+      },
+      "response": []
+    }
+  ]
+}
