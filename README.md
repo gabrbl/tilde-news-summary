@@ -133,21 +133,6 @@ NEXT_PUBLIC_API_TIMEOUT=15000
 
 ## Endpoints disponibles
 
-### `GET /api`
-Devuelve metadatos generales de la API y los endpoints disponibles.
-
-### `GET /api/health`
-Comprueba el estado del servicio.
-
-**Ejemplo de respuesta**
-```json
-{
-  "status": "OK",
-  "timestamp": "2025-01-01T12:00:00.000Z",
-  "service": "tilde-news-api"
-}
-```
-
 ### `GET /api/news`
 Obtiene noticias desde Google News RSS.
 

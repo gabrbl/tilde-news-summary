@@ -21,6 +21,21 @@ interface StockDataPoint {
   volume: number;
 }
 
+type ChartQuoteEntry = {
+  date?: Date | number | string;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
+  close?: number | null;
+  volume?: number | null;
+  adjclose?: number | null;
+  adjClose?: number | null;
+};
+
+type ChartResultWithQuotes = Awaited<ReturnType<typeof yahooFinance.chart>> & {
+  quotes?: ChartQuoteEntry[];
+};
+
 async function searchSymbols(query: string): Promise<Array<{
   symbol: string;
   name?: string;
@@ -99,9 +114,72 @@ export async function GET(request: NextRequest) {
       queryOptions.period = "max";
     }
 
-    const result = await yahooFinance.chart(cleanedSymbol, queryOptions);
+  const result = (await yahooFinance.chart(cleanedSymbol, queryOptions)) as ChartResultWithQuotes;
 
-    if (!result || !result.quotes || result.quotes.length === 0) {
+    const timestamps: number[] = Array.isArray(result?.timestamp)
+      ? (result.timestamp as number[])
+      : [];
+
+    const quoteSeries = Array.isArray(result?.indicators?.quote)
+      ? result.indicators!.quote
+      : [];
+
+    const quoteData = quoteSeries[0];
+
+    const adjCloseSeries = Array.isArray(result?.indicators?.adjclose)
+      ? result.indicators!.adjclose
+      : [];
+
+    const adjCloseData = adjCloseSeries[0];
+
+    const quotes = Array.isArray(result?.quotes) ? result.quotes : [];
+
+    let parsed: StockDataPoint[] = [];
+
+    if (quotes.length > 0) {
+      parsed = quotes
+        .filter((entry: any) => entry && entry.date)
+        .map((entry: any) => {
+          const dateValue = entry.date instanceof Date
+            ? entry.date
+            : typeof entry.date === "number"
+              ? new Date(entry.date * 1000)
+              : new Date(entry.date);
+
+          const adjCloseValue = entry.adjclose ?? entry.adjClose ?? entry.close;
+
+          return {
+            date: dateValue.toISOString().split("T")[0],
+            open: entry.open ?? 0,
+            high: entry.high ?? 0,
+            low: entry.low ?? 0,
+            close: entry.close ?? 0,
+            adjustedClose: adjCloseValue ?? 0,
+            volume: entry.volume ?? 0
+          };
+        });
+    } else if (timestamps.length && quoteData) {
+      parsed = timestamps.map((timestamp, index) => {
+        const open = quoteData.open?.[index];
+        const high = quoteData.high?.[index];
+        const low = quoteData.low?.[index];
+        const close = quoteData.close?.[index];
+        const volume = quoteData.volume?.[index];
+        const adjustedClose = adjCloseData?.adjclose?.[index] ?? close;
+
+        return {
+          date: new Date(timestamp * 1000).toISOString().split("T")[0],
+          open: open ?? 0,
+          high: high ?? 0,
+          low: low ?? 0,
+          close: close ?? 0,
+          adjustedClose: adjustedClose ?? 0,
+          volume: volume ?? 0
+        };
+      });
+    }
+
+    if (parsed.length === 0) {
       // Intentar buscar sugerencias
       const suggestions = await searchSymbols(cleanedSymbol);
       
@@ -114,17 +192,6 @@ export async function GET(request: NextRequest) {
         { status: 404 }
       );
     }
-
-    // Transformar datos al formato esperado
-    const parsed: StockDataPoint[] = result.quotes.map((entry: any) => ({
-      date: new Date(entry.date).toISOString().split("T")[0],
-      open: entry.open || 0,
-      high: entry.high || 0,
-      low: entry.low || 0,
-      close: entry.close || 0,
-      adjustedClose: entry.adjClose || entry.close || 0,
-      volume: entry.volume || 0
-    }));
 
     // Ordenar por fecha
     parsed.sort((a, b) => a.date.localeCompare(b.date));
@@ -148,9 +215,14 @@ export async function GET(request: NextRequest) {
 
     try {
       const quote = await yahooFinance.quote(cleanedSymbol);
-      lastUpdated = quote.regularMarketTime 
-        ? new Date(quote.regularMarketTime * 1000).toISOString()
-        : null;
+      const regularMarketTime = quote.regularMarketTime;
+      if (regularMarketTime instanceof Date) {
+        lastUpdated = regularMarketTime.toISOString();
+      } else if (typeof regularMarketTime === "number") {
+        lastUpdated = new Date(regularMarketTime * 1000).toISOString();
+      } else {
+        lastUpdated = null;
+      }
       timezone = quote.exchangeTimezoneName || null;
     } catch (error) {
       console.warn("No se pudieron obtener metadatos del símbolo:", error);

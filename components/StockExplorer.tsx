@@ -348,11 +348,11 @@ export default function StockExplorer() {
           displayColors: false,
           titleFont: {
             size: 11,
-            weight: "600"
+            weight: 600
           },
           bodyFont: {
             size: 11,
-            weight: "400"
+            weight: 400
           },
           callbacks: {
             title: (context: any) => {
