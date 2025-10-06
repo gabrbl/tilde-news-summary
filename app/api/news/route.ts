@@ -42,6 +42,9 @@ function buildGoogleNewsURL(
     ceid: `${country}:${language}`
   });
 
+  console.log({params});
+  
+
   return `${baseURL}?${params.toString()}`;
 }
 

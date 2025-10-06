@@ -1,4 +1,4 @@
-.stocks-page {
+﻿.stocks-page {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -14,7 +14,7 @@
   gap: 0.75rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border-radius: 12px;
+  border-radius: 0;
   padding: 1.8rem;
   box-shadow: 0 20px 45px rgba(102, 126, 234, 0.3);
 }
@@ -63,7 +63,7 @@
 .input-group input {
   flex: 1;
   padding: 0.75rem 1rem;
-  border-radius: 10px;
+  border-radius: 0;
   border: 2px solid #e2e8f0;
   font-size: 1rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -80,7 +80,7 @@
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
-  border-radius: 10px;
+  border-radius: 0;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease;
@@ -100,7 +100,7 @@
   display: flex;
   gap: 0.75rem;
   background: white;
-  border-radius: 999px;
+  border-radius: 0;
   padding: 0.5rem;
   box-shadow: 0 12px 24px rgba(37, 56, 88, 0.08);
 }
@@ -109,7 +109,7 @@
   border: none;
   background: transparent;
   padding: 0.5rem 1.25rem;
-  border-radius: 999px;
+  border-radius: 0;
   font-weight: 600;
   color: #4a5568;
   cursor: pointer;
@@ -131,7 +131,7 @@
   border: 1px solid #fc8181;
   color: #822727;
   padding: 1rem;
-  border-radius: 12px;
+  border-radius: 0;
   font-weight: 500;
   display: flex;
   gap: 0.85rem;
@@ -160,7 +160,7 @@
   font-weight: 400;
   padding: 0.65rem;
   background: rgba(255, 255, 255, 0.6);
-  border-radius: 8px;
+  border-radius: 0;
   border-left: 3px solid #f59e0b;
   color: #78350f;
 }
@@ -193,7 +193,7 @@
   background: rgba(130, 39, 39, 0.08);
   color: #822727;
   padding: 0.5rem 0.75rem;
-  border-radius: 999px;
+  border-radius: 0;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease;
   display: flex;
@@ -223,7 +223,7 @@
 .chart-card,
 .table-card {
   background: white;
-  border-radius: 14px;
+  border-radius: 0;
   padding: 1.5rem;
   box-shadow: 0 24px 40px rgba(15, 23, 42, 0.12);
 }
@@ -254,7 +254,7 @@
   align-items: flex-end;
   background: linear-gradient(135deg, rgba(90, 103, 216, 0.14), rgba(118, 75, 162, 0.18));
   padding: 0.85rem 1.1rem;
-  border-radius: 12px;
+  border-radius: 0;
   color: #2d3748;
 }
 
@@ -349,7 +349,7 @@
   .range-selector {
     justify-content: space-between;
     flex-wrap: wrap;
-    border-radius: 16px;
+    border-radius: 0;
   }
 
   .range-selector button {
@@ -384,7 +384,7 @@
 
 .spike-popover {
   background: white;
-  border-radius: 12px;
+  border-radius: 0;
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.1);
   padding: 1.25rem;
   min-width: 320px;
@@ -463,3 +463,4 @@
 .news-summary {
   margin: 0;
 }
+

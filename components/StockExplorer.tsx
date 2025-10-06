@@ -53,7 +53,7 @@ interface PriceSpike {
 }
 
 type RangeOption = {
-  value: "1M" | "3M" | "6M" | "1Y" | "MAX";
+  value: "1M" | "3M" | "6M" | "1Y" | "2Y" | "MAX";
   label: string;
 };
 
@@ -62,10 +62,10 @@ const RANGE_OPTIONS: RangeOption[] = [
   { value: "3M", label: "3 meses" },
   { value: "6M", label: "6 meses" },
   { value: "1Y", label: "1 año" },
-  { value: "MAX", label: "Máximo" }
+  // { value: "MAX", label: "Máximo" }
 ];
 
-const DEFAULT_SYMBOL = "AAPL";
+const DEFAULT_SYMBOL = "YPF";
 
 export default function StockExplorer() {
   const [symbol, setSymbol] = useState<string>(DEFAULT_SYMBOL);
@@ -200,12 +200,12 @@ export default function StockExplorer() {
           label: `Precio de cierre (${symbol})`,
           data: data.map((point) => point.close),
           borderColor: "#5a67d8",
-          backgroundColor: "rgba(90, 103, 216, 0.15)",
+          backgroundColor: "rgba(90, 103, 216, 0.08)",
           fill: true,
-          tension: 0.25,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          borderWidth: 2,
+          tension: 0,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          borderWidth: 1.5,
           pointBackgroundColor: "#5a67d8",
           pointBorderColor: "#fff",
           pointBorderWidth: 1
@@ -294,19 +294,40 @@ export default function StockExplorer() {
         x: {
           ticks: {
             maxTicksLimit: 10,
-            color: "#4a5568"
+            color: "#6b7280",
+            font: {
+              size: 11
+            }
           },
           grid: {
-            color: "rgba(203, 213, 224, 0.35)"
+            display: true,
+            color: "rgba(229, 231, 235, 0.5)",
+            drawTicks: true,
+            tickLength: 5
+          },
+          border: {
+            display: true,
+            color: "#d1d5db"
           }
         },
         y: {
+          position: "right" as const,
           ticks: {
-            color: "#4a5568",
-            callback: (value: number | string) => `$${value}`
+            color: "#6b7280",
+            font: {
+              size: 11
+            },
+            callback: (value: number | string) => `$${value}`,
+            padding: 8
           },
           grid: {
-            color: "rgba(226, 232, 240, 0.35)"
+            display: true,
+            color: "rgba(229, 231, 235, 0.5)",
+            drawTicks: false
+          },
+          border: {
+            display: true,
+            color: "#d1d5db"
           }
         }
       },
@@ -318,13 +339,21 @@ export default function StockExplorer() {
           }
         },
         tooltip: {
-          backgroundColor: "rgba(26, 32, 44, 0.95)",
-          titleColor: "#fff",
-          bodyColor: "#e2e8f0",
-          borderColor: "rgba(90, 103, 216, 0.5)",
+          backgroundColor: "rgba(17, 24, 39, 0.96)",
+          titleColor: "#f9fafb",
+          bodyColor: "#d1d5db",
+          borderColor: "#374151",
           borderWidth: 1,
-          padding: 12,
-          displayColors: true,
+          padding: 10,
+          displayColors: false,
+          titleFont: {
+            size: 11,
+            weight: "600"
+          },
+          bodyFont: {
+            size: 11,
+            weight: "400"
+          },
           callbacks: {
             title: (context: any) => {
               return context[0].label;
@@ -396,7 +425,7 @@ export default function StockExplorer() {
     console.log(`Fetching news for ${symbol} on ${spike.date}`);
 
     try {
-      const companyName = symbol;
+      const companyName = `Acciones ${symbol}`;
       const response = await fetch(
         `/api/news?query=${encodeURIComponent(companyName)}&date=${spike.date}&limit=5`
       );
@@ -630,40 +659,6 @@ export default function StockExplorer() {
         )}
       </section>
 
-      {!loading && data.length > 0 && (
-        <section className="table-card">
-          <h3>Últimos datos diarios</h3>
-          <div className="table-wrapper" role="region" aria-live="polite">
-            <table>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Apertura</th>
-                  <th>Cierre</th>
-                  <th>Mínimo</th>
-                  <th>Máximo</th>
-                  <th>Volumen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data
-                  .slice(-10)
-                  .reverse()
-                  .map((point) => (
-                    <tr key={point.date}>
-                      <td>{point.date}</td>
-                      <td>${point.open.toFixed(2)}</td>
-                      <td>${point.close.toFixed(2)}</td>
-                      <td>${point.low.toFixed(2)}</td>
-                      <td>${point.high.toFixed(2)}</td>
-                      <td>{point.volume.toLocaleString()}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
     </div>
   );
 }
