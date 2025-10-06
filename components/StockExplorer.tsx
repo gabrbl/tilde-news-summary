@@ -494,14 +494,6 @@ export default function StockExplorer() {
           <h1>Explorador de Acciones</h1>
           <p>Consulta cotizaciones históricas con datos diarios y visualízalas en un gráfico interactivo.</p>
         </div>
-        <div className="header-meta">
-          {meta?.lastUpdated && (
-            <p>
-              Última actualización API: <strong>{meta.lastUpdated}</strong>
-              {meta?.timezone && <span> ({meta.timezone})</span>}
-            </p>
-          )}
-        </div>
       </header>
 
       {hoveredSpike && popoverPosition && (

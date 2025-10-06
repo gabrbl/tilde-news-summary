@@ -1,39 +1,42 @@
 ﻿.stocks-page {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 2rem;
-  min-height: 100vh;
-  background: #f4f6fb;
+  gap: 0;
+  padding: 0;
+  min-height: calc(100vh - 64px);
+  background: #fafbfc;
   color: #1a202c;
 }
 
 .stocks-header {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  gap: 0.5rem;
+  background: white;
+  color: #1a202c;
   border-radius: 0;
-  padding: 1.8rem;
-  box-shadow: 0 20px 45px rgba(102, 126, 234, 0.3);
+  padding: 1.5rem 2rem;
+  border-bottom: 3px solid #e5e7eb;
 }
 
 .stocks-header h1 {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a202c;
 }
 
 .stocks-header p {
   margin: 0;
-  font-size: 1rem;
-  opacity: 0.9;
+  font-size: 0.95rem;
+  color: #6b7280;
   max-width: 640px;
 }
 
 .header-meta p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  color: #6b7280;
 }
 
 .stocks-controls {
@@ -41,6 +44,9 @@
   flex-wrap: wrap;
   gap: 1.5rem;
   align-items: flex-end;
+  padding: 1.5rem 2rem;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .symbol-search {
@@ -127,16 +133,16 @@
 }
 
 .stocks-error {
-  background: linear-gradient(135deg, #fed7d7 0%, #fecaca 100%);
-  border: 1px solid #fc8181;
-  color: #822727;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
   padding: 1rem;
+  margin: 1.5rem 2rem;
   border-radius: 0;
   font-weight: 500;
   display: flex;
   gap: 0.85rem;
   align-items: flex-start;
-  box-shadow: 0 4px 12px rgba(252, 129, 129, 0.15);
 }
 
 .error-icon {
@@ -224,8 +230,9 @@
 .table-card {
   background: white;
   border-radius: 0;
-  padding: 1.5rem;
-  box-shadow: 0 24px 40px rgba(15, 23, 42, 0.12);
+  padding: 2rem;
+  margin: 1.5rem 2rem;
+  border: 1px solid #e5e7eb;
 }
 
 .chart-header {
@@ -239,40 +246,45 @@
 
 .chart-header h2 {
   margin: 0;
-  font-size: 1.6rem;
-  color: #2d3748;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1a202c;
 }
 
 .chart-header p {
   margin: 0.25rem 0 0 0;
-  color: #4a5568;
+  color: #6b7280;
+  font-size: 0.9rem;
 }
 
 .price-highlight {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  background: linear-gradient(135deg, rgba(90, 103, 216, 0.14), rgba(118, 75, 162, 0.18));
+  background: #f9fafb;
   padding: 0.85rem 1.1rem;
   border-radius: 0;
-  color: #2d3748;
+  border: 1px solid #e5e7eb;
+  color: #1a202c;
 }
 
 .price-highlight span {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #4a5568;
+  color: #6b7280;
+  font-weight: 600;
 }
 
 .price-highlight strong {
-  font-size: 1.6rem;
-  color: #2d3748;
+  font-size: 1.5rem;
+  color: #1a202c;
+  font-weight: 700;
 }
 
 .price-highlight small {
   font-size: 0.75rem;
-  color: #4a5568;
+  color: #9ca3af;
 }
 
 .chart-wrapper {
@@ -284,19 +296,22 @@
 .loading-state,
 .empty-state {
   text-align: center;
-  color: #4a5568;
-  padding: 2rem;
+  color: #6b7280;
+  padding: 3rem 2rem;
 }
 
 .empty-state h3 {
   margin-top: 0;
-  color: #2d3748;
+  color: #1a202c;
+  font-weight: 600;
 }
 
 .table-card h3 {
   margin-top: 0;
   margin-bottom: 1rem;
-  color: #2d3748;
+  color: #1a202c;
+  font-weight: 700;
+  font-size: 1.1rem;
 }
 
 .table-wrapper {

@@ -1,7 +1,7 @@
 ﻿.news-search {
   display: grid;
   grid-template-columns: 400px 1fr;
-  height: 100vh;
+  height: calc(100vh - 64px);
   background: white;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -12,7 +12,7 @@
   border-right: 1px solid #e9ecef;
   padding: 2rem;
   overflow-y: auto;
-  height: 100vh;
+  height: calc(100vh - 64px);
 }
 
 .search-form h2 {
