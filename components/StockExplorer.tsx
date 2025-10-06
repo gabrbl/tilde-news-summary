@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { Line } from "react-chartjs-2";
 import {
   CategoryScale,
@@ -43,6 +43,15 @@ interface SymbolSuggestion {
   currency?: string;
 }
 
+interface PriceSpike {
+  date: string;
+  index: number;
+  close: number;
+  changePercent: number;
+  newsLoaded: boolean;
+  newsSummary: string | null;
+}
+
 type RangeOption = {
   value: "1M" | "3M" | "6M" | "1Y" | "MAX";
   label: string;
@@ -67,6 +76,10 @@ export default function StockExplorer() {
   const [data, setData] = useState<StockDataPoint[]>([]);
   const [meta, setMeta] = useState<{ lastUpdated: string | null; timezone: string | null } | null>(null);
   const [suggestions, setSuggestions] = useState<SymbolSuggestion[]>([]);
+  const [spikes, setSpikes] = useState<PriceSpike[]>([]);
+  const [hoveredSpike, setHoveredSpike] = useState<PriceSpike | null>(null);
+  const [popoverPosition, setPopoverPosition] = useState<{ x: number; y: number } | null>(null);
+  const chartRef = useRef<any>(null);
 
   const fetchStockData = useCallback(
     async (targetSymbol: string, selectedRange: RangeOption["value"]) => {
@@ -88,10 +101,23 @@ export default function StockExplorer() {
 
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));
-          setError(payload.message || "Error consultando la API de acciones");
+          
+          let errorMessage = payload.message || "Error consultando la API de acciones";
+          
+          // Personalizar mensajes según el código de estado
+          if (response.status === 429) {
+            errorMessage = "Has alcanzado el límite de solicitudes. Por favor, espera un minuto antes de intentar nuevamente.";
+          } else if (response.status === 503) {
+            errorMessage = "El servicio no está disponible temporalmente. Por favor, intenta más tarde.";
+          } else if (response.status === 504) {
+            errorMessage = "La solicitud tardó demasiado tiempo. Por favor, intenta nuevamente.";
+          }
+          
+          setError(errorMessage);
           setSuggestions(payload.suggestions ?? []);
           setData([]);
           setMeta(null);
+          setSpikes([]);
           return;
         }
 
@@ -109,6 +135,7 @@ export default function StockExplorer() {
         setError(err.message || "Error inesperado al obtener las cotizaciones");
         setData([]);
         setSuggestions([]);
+        setSpikes([]);
       } finally {
         setLoading(false);
       }
@@ -126,7 +153,46 @@ export default function StockExplorer() {
     });
   }, [fetchStockData, symbol, range]);
 
+  const detectSpikes = useCallback((prices: StockDataPoint[]): PriceSpike[] => {
+    if (prices.length < 2) {
+      return [];
+    }
+
+    const SPIKE_THRESHOLD = 5.0;
+    const detected: PriceSpike[] = [];
+
+    for (let i = 1; i < prices.length; i++) {
+      const prev = prices[i - 1];
+      const curr = prices[i];
+      const changePercent = ((curr.close - prev.close) / prev.close) * 100;
+
+      if (Math.abs(changePercent) >= SPIKE_THRESHOLD) {
+        detected.push({
+          date: curr.date,
+          index: i,
+          close: curr.close,
+          changePercent,
+          newsLoaded: false,
+          newsSummary: null
+        });
+      }
+    }
+
+    return detected;
+  }, []);
+
+  useEffect(() => {
+    if (data.length > 0) {
+      const detectedSpikes = detectSpikes(data);
+      setSpikes(detectedSpikes);
+    } else {
+      setSpikes([]);
+    }
+  }, [data, detectSpikes]);
+
   const chartData = useMemo(() => {
+    const spikeIndices = new Set(spikes.map((s) => s.index));
+    
     return {
       labels: data.map((point) => point.date),
       datasets: [
@@ -137,12 +203,27 @@ export default function StockExplorer() {
           backgroundColor: "rgba(90, 103, 216, 0.15)",
           fill: true,
           tension: 0.25,
-          pointRadius: 0,
-          borderWidth: 2
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          borderWidth: 2,
+          pointBackgroundColor: "#5a67d8",
+          pointBorderColor: "#fff",
+          pointBorderWidth: 1
+        },
+        {
+          label: "Picos significativos",
+          data: data.map((point, idx) => (spikeIndices.has(idx) ? point.close : null)),
+          borderColor: "#dc2626",
+          backgroundColor: "rgba(220, 38, 38, 0.85)",
+          pointRadius: data.map((_, idx) => (spikeIndices.has(idx) ? 8 : 0)),
+          pointHoverRadius: data.map((_, idx) => (spikeIndices.has(idx) ? 12 : 0)),
+          pointStyle: "circle",
+          showLine: false,
+          pointHitRadius: data.map((_, idx) => (spikeIndices.has(idx) ? 15 : 0))
         }
       ]
     };
-  }, [data, symbol]);
+  }, [data, symbol, spikes]);
 
   const chartOptions = useMemo(() => {
     return {
@@ -151,6 +232,63 @@ export default function StockExplorer() {
       interaction: {
         intersect: false,
         mode: "index" as const
+      },
+      onHover: (_event: any, elements: any[]) => {
+        const canvas = chartRef.current?.canvas;
+        if (canvas) {
+          // Cambiar cursor al pasar sobre spikes
+          if (elements.length > 0) {
+            const element = elements[0];
+            const clickedIndex = element.index;
+            const hasSpike = spikes.some((s) => s.index === clickedIndex);
+            canvas.style.cursor = hasSpike ? 'pointer' : 'default';
+          } else {
+            canvas.style.cursor = 'default';
+          }
+        }
+      },
+      onClick: (_event: any, elements: any[]) => {
+        console.log('Click event fired, elements:', elements);
+        
+        if (elements.length > 0) {
+          const element = elements[0];
+          console.log('First element:', element);
+          console.log('Dataset index:', element.datasetIndex);
+          console.log('Data index:', element.index);
+          
+          // Buscar si el click fue en algún spike, sin importar el dataset
+          const clickedIndex = element.index;
+          const clickedSpike = spikes.find((s) => s.index === clickedIndex);
+          
+          console.log('Clicked spike:', clickedSpike);
+          console.log('All spikes:', spikes);
+          
+          if (clickedSpike && chartRef.current) {
+            console.log('Opening popover for spike:', clickedSpike);
+            const chartInstance = chartRef.current;
+            
+            // Intentar obtener la posición del punto en el dataset de spikes (dataset 1)
+            const spikeMeta = chartInstance.getDatasetMeta(1);
+            const spikePoint = spikeMeta.data[clickedIndex];
+            
+            if (spikePoint) {
+              const rect = chartInstance.canvas.getBoundingClientRect();
+              const newPosition = {
+                x: rect.left + spikePoint.x,
+                y: rect.top + spikePoint.y
+              };
+              console.log('Setting popover position:', newPosition);
+              setPopoverPosition(newPosition);
+              setHoveredSpike(clickedSpike);
+            } else {
+              console.warn('Could not find spike point in chart');
+            }
+          } else {
+            console.log('No spike found for this click or chartRef not ready');
+          }
+        } else {
+          console.log('No elements clicked');
+        }
       },
       scales: {
         x: {
@@ -180,16 +318,53 @@ export default function StockExplorer() {
           }
         },
         tooltip: {
+          backgroundColor: "rgba(26, 32, 44, 0.95)",
+          titleColor: "#fff",
+          bodyColor: "#e2e8f0",
+          borderColor: "rgba(90, 103, 216, 0.5)",
+          borderWidth: 1,
+          padding: 12,
+          displayColors: true,
           callbacks: {
+            title: (context: any) => {
+              return context[0].label;
+            },
             label: (context: any) => {
               const price = context.parsed.y as number;
+              const datasetIndex = context.datasetIndex;
+              const dataIndex = context.dataIndex;
+              
+              if (datasetIndex === 1 && price !== null) {
+                const spike = spikes.find((s) => s.index === dataIndex);
+                if (spike) {
+                  return [
+                    `Cierre: $${price.toFixed(2)}`,
+                    `Variación: ${spike.changePercent > 0 ? '+' : ''}${spike.changePercent.toFixed(2)}%`,
+                    '⚠️ Click para ver noticias del día'
+                  ];
+                }
+              }
+              
+              if (datasetIndex === 0) {
+                const point = data[dataIndex];
+                if (point) {
+                  return [
+                    `Cierre: $${price.toFixed(2)}`,
+                    `Apertura: $${point.open.toFixed(2)}`,
+                    `Máximo: $${point.high.toFixed(2)}`,
+                    `Mínimo: $${point.low.toFixed(2)}`,
+                    `Volumen: ${point.volume.toLocaleString()}`
+                  ];
+                }
+              }
+              
               return `Cierre: $${price.toFixed(2)}`;
             }
           }
         }
       }
     };
-  }, []);
+  }, [spikes, data]);
 
   const handleSearch = () => {
     const cleaned = searchTerm.trim().toUpperCase();
@@ -213,6 +388,76 @@ export default function StockExplorer() {
 
   const latestPoint = data.length > 0 ? data[data.length - 1] : null;
 
+  const fetchNewsForSpike = useCallback(async (spike: PriceSpike) => {
+    if (spike.newsLoaded) {
+      return;
+    }
+
+    console.log(`Fetching news for ${symbol} on ${spike.date}`);
+
+    try {
+      const companyName = symbol;
+      const response = await fetch(
+        `/api/news?query=${encodeURIComponent(companyName)}&date=${spike.date}&limit=5`
+      );
+
+      console.log(`Response status: ${response.status}`);
+
+      if (!response.ok) {
+        console.warn(`No se pudieron obtener noticias para ${spike.date}`);
+        setSpikes((prev) =>
+          prev.map((s) =>
+            s.date === spike.date
+              ? { ...s, newsLoaded: true, newsSummary: "No se encontraron noticias para esta fecha." }
+              : s
+          )
+        );
+        setHoveredSpike((prev) => 
+          prev && prev.date === spike.date 
+            ? { ...prev, newsLoaded: true, newsSummary: "No se encontraron noticias para esta fecha." }
+            : prev
+        );
+        return;
+      }
+
+      const payload = await response.json();
+      console.log('Payload received:', payload);
+      const summary = payload.summary || "No hay resumen disponible.";
+
+      setSpikes((prev) =>
+        prev.map((s) =>
+          s.date === spike.date ? { ...s, newsLoaded: true, newsSummary: summary } : s
+        )
+      );
+      
+      setHoveredSpike((prev) => 
+        prev && prev.date === spike.date 
+          ? { ...prev, newsLoaded: true, newsSummary: summary }
+          : prev
+      );
+    } catch (error) {
+      console.error("Error fetching news:", error);
+      setSpikes((prev) =>
+        prev.map((s) =>
+          s.date === spike.date
+            ? { ...s, newsLoaded: true, newsSummary: "Error al cargar las noticias." }
+            : s
+        )
+      );
+      setHoveredSpike((prev) => 
+        prev && prev.date === spike.date 
+          ? { ...prev, newsLoaded: true, newsSummary: "Error al cargar las noticias." }
+          : prev
+      );
+    }
+  }, [symbol]);
+
+  useEffect(() => {
+    if (hoveredSpike && !hoveredSpike.newsLoaded) {
+      fetchNewsForSpike(hoveredSpike).catch(console.error);
+    }
+  }, [hoveredSpike, fetchNewsForSpike]);
+
   return (
     <div className="stocks-page">
       <header className="stocks-header">
@@ -229,6 +474,51 @@ export default function StockExplorer() {
           )}
         </div>
       </header>
+
+      {hoveredSpike && popoverPosition && (
+        <>
+          <div 
+            className="spike-popover-overlay" 
+            onClick={() => {
+              setHoveredSpike(null);
+              setPopoverPosition(null);
+            }}
+          />
+          <div
+            className="spike-popover"
+            style={{
+              position: "fixed",
+              left: `${popoverPosition.x}px`,
+              top: `${popoverPosition.y}px`,
+              transform: "translate(-50%, -120%)"
+            }}
+          >
+            <button
+              className="spike-popover-close"
+              onClick={() => {
+                setHoveredSpike(null);
+                setPopoverPosition(null);
+              }}
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+            <div className="spike-popover-header">
+              <h4>{hoveredSpike.date}</h4>
+              <span className={hoveredSpike.changePercent > 0 ? "change-positive" : "change-negative"}>
+                {hoveredSpike.changePercent > 0 ? "+" : ""}
+                {hoveredSpike.changePercent.toFixed(2)}%
+              </span>
+            </div>
+            <div className="spike-popover-body">
+              {!hoveredSpike.newsLoaded && <p className="loading-news">Cargando noticias...</p>}
+              {hoveredSpike.newsLoaded && (
+                <p className="news-summary">{hoveredSpike.newsSummary || "Sin noticias disponibles."}</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       <section className="stocks-controls">
         <div className="symbol-search">
@@ -266,34 +556,45 @@ export default function StockExplorer() {
 
       {error && (
         <div className="stocks-error" role="alert">
-          <p>{error}</p>
-          {suggestions.length > 0 && (
-            <ul className="stocks-suggestions">
-              {suggestions.map((item) => (
-                <li key={item.symbol}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchTerm(item.symbol);
-                      setSymbol(item.symbol);
-                      setError("");
-                      setSuggestions([]);
-                    }}
-                  >
-                    <span className="suggestion-symbol">{item.symbol}</span>
-                    {item.name && <span className="suggestion-name">{item.name}</span>}
-                    {(item.region || item.currency) && (
-                      <span className="suggestion-meta">
-                        {item.region && <span>{item.region}</span>}
-                        {item.region && item.currency && <span> · </span>}
-                        {item.currency && <span>{item.currency}</span>}
-                      </span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="error-icon">⚠️</div>
+          <div className="error-content">
+            <p className="error-message">{error}</p>
+            {error.includes("límite") && (
+              <p className="error-hint">
+                💡 Sugerencia: Si ves errores frecuentes, considera esperar un momento antes de intentar nuevamente.
+              </p>
+            )}
+            {suggestions.length > 0 && (
+              <div className="suggestions-container">
+                <p className="suggestions-title">¿Quisiste buscar alguno de estos?</p>
+                <ul className="stocks-suggestions">
+                  {suggestions.map((item) => (
+                    <li key={item.symbol}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm(item.symbol);
+                          setSymbol(item.symbol);
+                          setError("");
+                          setSuggestions([]);
+                        }}
+                      >
+                        <span className="suggestion-symbol">{item.symbol}</span>
+                        {item.name && <span className="suggestion-name">{item.name}</span>}
+                        {(item.region || item.currency) && (
+                          <span className="suggestion-meta">
+                            {item.region && <span>{item.region}</span>}
+                            {item.region && item.currency && <span> · </span>}
+                            {item.currency && <span>{item.currency}</span>}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -323,7 +624,7 @@ export default function StockExplorer() {
               )}
             </div>
             <div className="chart-wrapper">
-              <Line options={chartOptions} data={chartData} />
+              <Line options={chartOptions} data={chartData} ref={chartRef} />
             </div>
           </>
         )}

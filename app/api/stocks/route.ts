@@ -1,107 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import axios from "axios";
-
-const ALPHA_VANTAGE_API_URL = "https://www.alphavantage.co/query";
-const REQUEST_TIMEOUT = Number(process.env.STOCKS_API_TIMEOUT ?? 10000);
-
-interface AlphaVantageDailyEntry extends Record<string, string | undefined> {
-  "1. open": string;
-  "2. high": string;
-  "3. low": string;
-  "4. close": string;
-}
-
-interface AlphaVantageDailySeries {
-  [date: string]: AlphaVantageDailyEntry;
-}
+import yahooFinance from "yahoo-finance2";
 
 type TimeRange = "1M" | "3M" | "6M" | "1Y" | "MAX";
 
-const RANGE_TO_DAYS: Record<Exclude<TimeRange, "MAX">, number> = {
-  "1M": 22,
-  "3M": 66,
-  "6M": 132,
-  "1Y": 264
+const RANGE_TO_PERIOD: Record<TimeRange, string> = {
+  "1M": "1mo",
+  "3M": "3mo",
+  "6M": "6mo",
+  "1Y": "1y",
+  "MAX": "max"
 };
 
-function filterByRange<T extends { date: string }>(
-  data: T[],
-  range: TimeRange
-) {
-  if (range === "MAX") {
-    return data;
-  }
-
-  const days = RANGE_TO_DAYS[range];
-  return data.slice(-days);
+interface StockDataPoint {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  adjustedClose: number;
+  volume: number;
 }
 
-const TIME_SERIES_KEYS = [
-  "Time Series (Daily)",
-  "Time Series (Daily Adjusted)",
-  "Time Series (Digital Currency Daily)"
-] as const;
-
-type TimeSeriesKey = (typeof TIME_SERIES_KEYS)[number];
-
-type AlphaVantageFunction = "TIME_SERIES_DAILY_ADJUSTED" | "TIME_SERIES_DAILY";
-
-const FUNCTIONS_TO_TRY: AlphaVantageFunction[] = [
-  "TIME_SERIES_DAILY_ADJUSTED",
-  "TIME_SERIES_DAILY"
-];
-
-function extractSeries(data: Record<string, any>) {
-  for (const key of TIME_SERIES_KEYS) {
-    if (data[key]) {
-      return data[key] as AlphaVantageDailySeries;
-    }
-  }
-
-  return undefined;
-}
-
-async function callAlphaVantage(
-  symbol: string,
-  range: TimeRange,
-  apiKey: string,
-  fn: AlphaVantageFunction
-) {
-  const response = await axios.get(ALPHA_VANTAGE_API_URL, {
-    params: {
-      function: fn,
-      symbol,
-      outputsize: range === "MAX" || range === "1Y" ? "full" : "compact",
-      datatype: "json",
-      apikey: apiKey
-    },
-    timeout: REQUEST_TIMEOUT
-  });
-
-  return response.data;
-}
-
-async function suggestSymbols(symbol: string, apiKey: string) {
+async function searchSymbols(query: string): Promise<Array<{
+  symbol: string;
+  name?: string;
+  region?: string;
+  currency?: string;
+}>> {
   try {
-    const { data } = await axios.get(ALPHA_VANTAGE_API_URL, {
-      params: {
-        function: "SYMBOL_SEARCH",
-        keywords: symbol,
-        apikey: apiKey
-      },
-      timeout: REQUEST_TIMEOUT
+    const results = await yahooFinance.search(query, {
+      quotesCount: 5,
+      newsCount: 0
     });
 
-    const matches = (data?.bestMatches ?? []) as Array<Record<string, string>>;
-
-    return matches.slice(0, 5).map((match) => ({
-      symbol: match["1. symbol"],
-      name: match["2. name"],
-      region: match["4. region"],
-      currency: match["8. currency"]
+    const quotes = results.quotes || [];
+    return quotes.slice(0, 5).map((quote: any) => ({
+      symbol: quote.symbol || "",
+      name: quote.shortname || quote.longname || "",
+      region: quote.exchDisp || "",
+      currency: quote.currency || ""
     }));
   } catch (error) {
-    console.warn("No se pudieron obtener sugerencias de símbolos", error);
+    console.warn("No se pudieron obtener sugerencias de símbolos:", error);
     return [];
   }
 }
@@ -121,153 +61,153 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      {
-        error: "Service Unavailable",
-        message: "ALPHA_VANTAGE_API_KEY no configurada en el servidor"
-      },
-      { status: 503 }
-    );
-  }
-
   try {
-  let lastError: { status: number; body: Record<string, any> } | null = null;
+    const period = RANGE_TO_PERIOD[range];
+    const cleanedSymbol = symbol.trim().toUpperCase();
 
-    for (const fn of FUNCTIONS_TO_TRY) {
-      const data = await callAlphaVantage(symbol.toUpperCase(), range, apiKey, fn);
-
-      if (data.Note) {
-        return NextResponse.json(
-          {
-            error: "Too Many Requests",
-            message:
-              "Límite de la API de Alpha Vantage alcanzado. Intenta nuevamente en un minuto."
-          },
-          { status: 429 }
-        );
+    // Calcular período de inicio según el rango
+    let period1: Date | undefined;
+    if (range !== "MAX") {
+      period1 = new Date();
+      switch (range) {
+        case "1M":
+          period1.setMonth(period1.getMonth() - 1);
+          break;
+        case "3M":
+          period1.setMonth(period1.getMonth() - 3);
+          break;
+        case "6M":
+          period1.setMonth(period1.getMonth() - 6);
+          break;
+        case "1Y":
+          period1.setFullYear(period1.getFullYear() - 1);
+          break;
       }
-
-      if (data.Information) {
-        lastError = {
-          status: 400,
-          body: {
-            error: "Bad Request",
-            message: data.Information,
-            triedFunction: fn
-          }
-        };
-        continue;
-      }
-
-      if (data["Error Message"]) {
-        lastError = {
-          status: 400,
-          body: {
-            error: "Bad Request",
-            message: data["Error Message"],
-            triedFunction: fn
-          }
-        };
-        continue;
-      }
-
-      const series = extractSeries(data);
-
-      if (!series) {
-        lastError = {
-          status: 404,
-          body: {
-            error: "Not Found",
-            message: "No se encontraron datos históricos para el símbolo solicitado",
-            triedFunction: fn
-          }
-        };
-        continue;
-      }
-
-      const parsed = Object.keys(series)
-        .sort()
-        .map((date) => {
-          const entry = series[date];
-          const adjustedCloseValue = entry["5. adjusted close"] ?? entry["4. close"];
-          const volumeValue = entry["6. volume"] ?? entry["5. volume"] ?? "0";
-
-          return {
-            date,
-            open: Number.parseFloat(entry["1. open"]),
-            high: Number.parseFloat(entry["2. high"]),
-            low: Number.parseFloat(entry["3. low"]),
-            close: Number.parseFloat(entry["4. close"]),
-            adjustedClose: Number.parseFloat(adjustedCloseValue),
-            volume: Number.parseInt(volumeValue, 10)
-          };
-        });
-
-      const filtered = filterByRange(parsed, range);
-
-      return NextResponse.json({
-        success: true,
-        symbol: symbol.toUpperCase(),
-        range,
-        providerFunction: fn,
-        lastUpdated: data["Meta Data"]?.["3. Last Refreshed"] ?? null,
-        timezone: data["Meta Data"]?.["5. Time Zone"] ?? null,
-        data: filtered
-      });
     }
 
-    if (lastError) {
-      if (lastError.status === 404) {
-        const suggestions = await suggestSymbols(symbol, apiKey);
-        return NextResponse.json(
-          {
-            ...lastError.body,
-            suggestions
-          },
-          { status: lastError.status }
-        );
-      }
+    // Obtener datos históricos usando chart()
+    const queryOptions: any = {
+      period1: period1,
+      period2: new Date(),
+      interval: "1d" as const
+    };
 
-      return NextResponse.json(lastError.body, { status: lastError.status });
+    // Si es MAX, usamos period en lugar de period1/period2
+    if (range === "MAX") {
+      delete queryOptions.period1;
+      delete queryOptions.period2;
+      queryOptions.period = "max";
     }
 
-    return NextResponse.json(
-      {
-        error: "Not Found",
-        message: "No se encontraron datos históricos para el símbolo solicitado"
-      },
-      { status: 404 }
-    );
+    const result = await yahooFinance.chart(cleanedSymbol, queryOptions);
+
+    if (!result || !result.quotes || result.quotes.length === 0) {
+      // Intentar buscar sugerencias
+      const suggestions = await searchSymbols(cleanedSymbol);
+      
+      return NextResponse.json(
+        {
+          error: "Not Found",
+          message: `No se encontraron datos históricos para el símbolo "${cleanedSymbol}". Verifica que el ticker sea correcto.`,
+          suggestions
+        },
+        { status: 404 }
+      );
+    }
+
+    // Transformar datos al formato esperado
+    const parsed: StockDataPoint[] = result.quotes.map((entry: any) => ({
+      date: new Date(entry.date).toISOString().split("T")[0],
+      open: entry.open || 0,
+      high: entry.high || 0,
+      low: entry.low || 0,
+      close: entry.close || 0,
+      adjustedClose: entry.adjClose || entry.close || 0,
+      volume: entry.volume || 0
+    }));
+
+    // Ordenar por fecha
+    parsed.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Filtrar según el rango solicitado
+    let filtered = parsed;
+    if (range !== "MAX") {
+      const periodMap: Record<Exclude<TimeRange, "MAX">, number> = {
+        "1M": 22,
+        "3M": 66,
+        "6M": 132,
+        "1Y": 264
+      };
+      const days = periodMap[range];
+      filtered = parsed.slice(-days);
+    }
+
+    // Obtener metadatos del símbolo
+    let lastUpdated: string | null = null;
+    let timezone: string | null = null;
+
+    try {
+      const quote = await yahooFinance.quote(cleanedSymbol);
+      lastUpdated = quote.regularMarketTime 
+        ? new Date(quote.regularMarketTime * 1000).toISOString()
+        : null;
+      timezone = quote.exchangeTimezoneName || null;
+    } catch (error) {
+      console.warn("No se pudieron obtener metadatos del símbolo:", error);
+    }
+
+    return NextResponse.json({
+      success: true,
+      symbol: cleanedSymbol,
+      range,
+      provider: "Yahoo Finance",
+      lastUpdated,
+      timezone,
+      data: filtered
+    });
+
   } catch (error: any) {
-    console.error("Error fetching stock data:", error);
+    console.error("Error fetching stock data from Yahoo Finance:", error);
 
-    if (error.code === "ETIMEDOUT" || error.code === "ECONNABORTED") {
+    // Manejar errores específicos de Yahoo Finance
+    if (error.message?.includes("No data found") || error.message?.includes("Not Found")) {
+      const suggestions = await searchSymbols(symbol);
+      
+      return NextResponse.json(
+        {
+          error: "Not Found",
+          message: `El símbolo "${symbol}" no fue encontrado. Intenta con otro ticker.`,
+          suggestions
+        },
+        { status: 404 }
+      );
+    }
+
+    if (error.message?.includes("Too Many Requests") || error.code === "ETIMEDOUT") {
+      return NextResponse.json(
+        {
+          error: "Too Many Requests",
+          message: "Demasiadas solicitudes. Por favor, espera un momento antes de intentar nuevamente."
+        },
+        { status: 429 }
+      );
+    }
+
+    if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
       return NextResponse.json(
         {
           error: "Gateway Timeout",
-          message: "La solicitud a Alpha Vantage excedió el tiempo de espera"
+          message: "La solicitud tardó demasiado tiempo. Por favor, intenta nuevamente."
         },
         { status: 504 }
       );
     }
 
-    if (error.response) {
-      return NextResponse.json(
-        {
-          error: "Upstream Error",
-          message: error.response.data?.message ?? "Error desde la API de Alpha Vantage"
-        },
-        { status: 502 }
-      );
-    }
-
+    // Error genérico
     return NextResponse.json(
       {
         error: "Internal Server Error",
-        message: error.message ?? "Error inesperado obteniendo los datos bursátiles"
+        message: "Error inesperado obteniendo los datos bursátiles. Por favor, intenta nuevamente."
       },
       { status: 500 }
     );

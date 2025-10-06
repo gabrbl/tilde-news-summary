@@ -127,21 +127,57 @@
 }
 
 .stocks-error {
-  background: #fed7d7;
+  background: linear-gradient(135deg, #fed7d7 0%, #fecaca 100%);
   border: 1px solid #fc8181;
   color: #822727;
-  padding: 0.85rem 1rem;
-  border-radius: 10px;
+  padding: 1rem;
+  border-radius: 12px;
   font-weight: 500;
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  box-shadow: 0 4px 12px rgba(252, 129, 129, 0.15);
 }
 
-.stocks-error p {
-  margin: 0;
+.error-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.error-content {
+  flex: 1;
+}
+
+.error-message {
+  margin: 0 0 0.5rem 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.error-hint {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.85rem;
+  font-weight: 400;
+  padding: 0.65rem;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  border-left: 3px solid #f59e0b;
+  color: #78350f;
+}
+
+.suggestions-container {
+  margin-top: 0.85rem;
+}
+
+.suggestions-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .stocks-suggestions {
   list-style: none;
-  margin: 0.75rem 0 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
@@ -333,4 +369,97 @@
   .price-highlight {
     align-items: flex-start;
   }
+}
+
+.spike-popover-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 999;
+  cursor: pointer;
+}
+
+.spike-popover {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.1);
+  padding: 1.25rem;
+  min-width: 320px;
+  max-width: 450px;
+  z-index: 1000;
+  animation: popoverFadeIn 0.2s ease;
+}
+
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -115%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -120%);
+  }
+}
+
+.spike-popover-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: #4a5568;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.spike-popover-close:hover {
+  color: #2d3748;
+}
+
+.spike-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+  padding-right: 1.5rem;
+}
+
+.spike-popover-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #2d3748;
+}
+
+.spike-popover-header .change-positive {
+  color: #22c55e;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.spike-popover-header .change-negative {
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.spike-popover-body {
+  color: #4a5568;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.loading-news {
+  margin: 0;
+  font-style: italic;
+  color: #718096;
+}
+
+.news-summary {
+  margin: 0;
 }

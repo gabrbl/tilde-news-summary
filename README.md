@@ -26,7 +26,7 @@ Aplicación web construida con Next.js 15 que permite buscar titulares recientes
 - **Resumen automatizado** con OpenAI (opcional) que condensa los títulos más repetidos en un único párrafo informativo.
 - **Gestión de errores** clara, mostrando mensajes diferenciados para problemas de validación, límites de la API o conectividad.
 - **Experiencia en tiempo real**: los resultados se obtienen directamente desde Google News al momento de la consulta.
-- **Explorador bursátil** con gráficos interactivos y datos históricos diarios provistos por Alpha Vantage.
+- **Explorador bursátil** con gráficos interactivos y datos históricos diarios provistos por Yahoo Finance.
 
 ## Stack tecnológico
 
@@ -35,7 +35,7 @@ Aplicación web construida con Next.js 15 que permite buscar titulares recientes
 - [xml2js](https://www.npmjs.com/package/xml2js) para transformar el feed RSS en objetos JavaScript.
 - [OpenAI Node SDK v4](https://github.com/openai/openai-node) para el resumen automatizado (modelos GPT-4o mini).
 - [Chart.js](https://www.chartjs.org/) + [react-chartjs-2](https://react-chartjs-2.js.org/) para la renderización de gráficos bursátiles.
-- [Alpha Vantage](https://www.alphavantage.co/documentation/) como fuente de datos históricos de acciones.
+- [Yahoo Finance](https://github.com/gadicc/node-yahoo-finance2) como fuente gratuita de datos históricos de acciones (sin API key requerida).
 - Estilos con CSS modular (`NewsSearch.css`) y tipografía global definida en `globals.css`.
 
 ## Estructura del proyecto
@@ -48,7 +48,7 @@ app/
     route.ts        # Índice de la API con información general
     health/route.ts # Endpoint de health-check
     news/route.ts   # Endpoint que consulta Google News RSS y opcionalmente OpenAI
-    stocks/route.ts # Endpoint que obtiene precios diarios desde Alpha Vantage
+    stocks/route.ts # Endpoint que obtiene precios diarios desde Yahoo Finance
 components/
   NewsSearch.tsx    # Componente principal del buscador con lógica de UI
   NewsSearch.css    # Estilos específicos del componente
@@ -86,15 +86,10 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
 
 # Tiempo máximo de espera (ms) para las solicitudes desde el cliente
 NEXT_PUBLIC_API_TIMEOUT=15000
-
-# API key gratuita de Alpha Vantage (https://www.alphavantage.co/support/#api-key)
-ALPHA_VANTAGE_API_KEY=tu_api_key
-
-# (Opcional) timeout en ms al consumir Alpha Vantage desde el backend
-STOCKS_API_TIMEOUT=10000
 ```
 
 > Si `OPENAI_API_KEY` no está definido, la aplicación seguirá funcionando; simplemente omitirá el resumen automatizado.
+> Yahoo Finance no requiere API key y es completamente gratuito para consultas razonables.
 
 ## Puesta en marcha
 
@@ -132,8 +127,8 @@ STOCKS_API_TIMEOUT=10000
 ## Explorador de acciones
 
 - Página disponible en `/stocks` con buscador de ticker, selector de periodo (1M, 3M, 6M, 1Y o máximo disponible) y gráfico lineal de precios de cierre diarios.
-- Requiere configurar `ALPHA_VANTAGE_API_KEY` (plan gratuito con hasta 5 solicitudes por minuto y 500 por día). Si se supera el límite, la UI mostrará un mensaje de espera.
-- La API interna `/api/stocks` normaliza la respuesta de Alpha Vantage y expone datos listos para graficar: fecha, apertura, cierre, máximos, mínimos y volumen.
+- **No requiere API key**: utiliza Yahoo Finance de forma completamente gratuita y sin límites estrictos.
+- La API interna `/api/stocks` obtiene datos históricos de Yahoo Finance y los normaliza exponiendo: fecha, apertura, cierre, máximos, mínimos y volumen.
 - Incluye tabla de los últimos 10 días y resaltado del último precio de cierre para facilitar el análisis rápido.
 
 ## Endpoints disponibles
