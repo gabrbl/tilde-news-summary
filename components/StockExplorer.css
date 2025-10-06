@@ -353,18 +353,20 @@
 
 @media (max-width: 768px) {
   .stocks-page {
-    padding: 1rem;
+    padding: 0;
   }
 
   .stocks-controls {
     flex-direction: column;
     align-items: stretch;
+    padding: 1rem;
   }
 
   .range-selector {
     justify-content: space-between;
     flex-wrap: wrap;
     border-radius: 0;
+    width: 100%;
   }
 
   .range-selector button {
@@ -374,15 +376,30 @@
 
   .chart-card,
   .table-card {
-    padding: 1.25rem;
+    padding: 1.5rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0;
+    width: 100%;
+    overflow: hidden;
   }
 
   .chart-wrapper {
-    height: 300px;
+    height: auto;
+    min-height: 320px;
+    margin: 0 -1rem;
   }
 
   .price-highlight {
     align-items: flex-start;
+  }
+
+  .stocks-header {
+    padding: 1.25rem 1rem;
+  }
+
+  .stocks-error {
+    margin: 1rem 0;
+    border-radius: 0;
   }
 }
 

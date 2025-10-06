@@ -248,23 +248,15 @@ export default function StockExplorer() {
         }
       },
       onClick: (_event: any, elements: any[]) => {
-        console.log('Click event fired, elements:', elements);
         
         if (elements.length > 0) {
           const element = elements[0];
-          console.log('First element:', element);
-          console.log('Dataset index:', element.datasetIndex);
-          console.log('Data index:', element.index);
           
           // Buscar si el click fue en algún spike, sin importar el dataset
           const clickedIndex = element.index;
           const clickedSpike = spikes.find((s) => s.index === clickedIndex);
           
-          console.log('Clicked spike:', clickedSpike);
-          console.log('All spikes:', spikes);
-          
           if (clickedSpike && chartRef.current) {
-            console.log('Opening popover for spike:', clickedSpike);
             const chartInstance = chartRef.current;
             
             // Intentar obtener la posición del punto en el dataset de spikes (dataset 1)
@@ -277,7 +269,6 @@ export default function StockExplorer() {
                 x: rect.left + spikePoint.x,
                 y: rect.top + spikePoint.y
               };
-              console.log('Setting popover position:', newPosition);
               setPopoverPosition(newPosition);
               setHoveredSpike(clickedSpike);
             } else {
@@ -421,17 +412,11 @@ export default function StockExplorer() {
     if (spike.newsLoaded) {
       return;
     }
-
-    console.log(`Fetching news for ${symbol} on ${spike.date}`);
-
     try {
       const companyName = `Acciones ${symbol}`;
       const response = await fetch(
         `/api/news?query=${encodeURIComponent(companyName)}&date=${spike.date}&limit=5`
       );
-
-      console.log(`Response status: ${response.status}`);
-
       if (!response.ok) {
         console.warn(`No se pudieron obtener noticias para ${spike.date}`);
         setSpikes((prev) =>

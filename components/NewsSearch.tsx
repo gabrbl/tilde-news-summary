@@ -72,7 +72,6 @@ const NewsSearch = () => {
         setTotalResults(result.totalResults);
         setSummary(result.summary || "");
         setError("");
-        console.log(`✅ Búsqueda exitosa: ${result.totalResults} noticias encontradas`);
       } else {
         setNews([]);
         setTotalResults(0);
@@ -184,13 +183,20 @@ const NewsSearch = () => {
           {error && <div className="error-message">{error}</div>}
 
           {summary && query && (
-            <div className="news-summary search-summary">
+            <div className="news-summary search-summary desktop-summary">
               <h4>Resumen de las noticias</h4>
               <p>{summary}</p>
             </div>
           )}
         </div>
       </div>
+
+      {summary && query && (
+        <div className="news-summary mobile-summary">
+          <h4>Resumen de las noticias</h4>
+          <p>{summary}</p>
+        </div>
+      )}
 
       <div className="news-results">
         {totalResults > 0 && (
