@@ -265,9 +265,24 @@ export default function StockExplorer() {
             
             if (spikePoint) {
               const rect = chartInstance.canvas.getBoundingClientRect();
+              const rawX = rect.left + spikePoint.x;
+              const rawY = rect.top + spikePoint.y;
+
+              const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 0;
+              const horizontalPadding = 16;
+              const effectivePopoverWidth = viewportWidth
+                ? Math.min(360, viewportWidth - horizontalPadding * 2)
+                : 360;
+              const minX = horizontalPadding + effectivePopoverWidth / 2;
+              const maxX = viewportWidth
+                ? viewportWidth - horizontalPadding - effectivePopoverWidth / 2
+                : rawX;
+
+              const clampedX = viewportWidth ? Math.min(Math.max(rawX, minX), maxX) : rawX;
+
               const newPosition = {
-                x: rect.left + spikePoint.x,
-                y: rect.top + spikePoint.y
+                x: clampedX,
+                y: rawY
               };
               setPopoverPosition(newPosition);
               setHoveredSpike(clickedSpike);

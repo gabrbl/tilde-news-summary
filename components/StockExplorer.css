@@ -419,8 +419,7 @@
   border-radius: 0;
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.1);
   padding: 1.25rem;
-  min-width: 320px;
-  max-width: 450px;
+  width: min(360px, calc(100vw - 32px));
   z-index: 1000;
   animation: popoverFadeIn 0.2s ease;
 }
