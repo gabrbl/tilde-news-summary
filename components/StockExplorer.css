@@ -467,6 +467,20 @@
   color: #2d3748;
 }
 
+.spike-popover-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.spike-popover-title small {
+  font-size: 0.75rem;
+  color: #6b7280;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
 .spike-popover-header .change-positive {
   color: #22c55e;
   font-weight: 700;
@@ -479,10 +493,26 @@
   font-size: 1rem;
 }
 
+.spike-popover-header .change-neutral {
+  color: #4a5568;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
 .spike-popover-body {
   color: #4a5568;
   font-size: 0.92rem;
   line-height: 1.6;
+}
+
+.price-detail {
+  margin: 0 0 0.5rem 0;
+  color: #4a5568;
+}
+
+.price-detail strong {
+  font-weight: 700;
+  color: #1f2937;
 }
 
 .loading-news {

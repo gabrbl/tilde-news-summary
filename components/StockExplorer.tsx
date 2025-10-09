@@ -50,6 +50,7 @@ interface PriceSpike {
   changePercent: number;
   newsLoaded: boolean;
   newsSummary: string | null;
+  kind: "spike" | "point";
 }
 
 type RangeOption = {
@@ -80,6 +81,7 @@ export default function StockExplorer() {
   const [hoveredSpike, setHoveredSpike] = useState<PriceSpike | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ x: number; y: number } | null>(null);
   const chartRef = useRef<any>(null);
+  const newsCacheRef = useRef<Record<string, string>>({});
 
   const fetchStockData = useCallback(
     async (targetSymbol: string, selectedRange: RangeOption["value"]) => {
@@ -173,7 +175,8 @@ export default function StockExplorer() {
           close: curr.close,
           changePercent,
           newsLoaded: false,
-          newsSummary: null
+          newsSummary: null,
+          kind: "spike"
         });
       }
     }
@@ -235,66 +238,85 @@ export default function StockExplorer() {
       },
       onHover: (_event: any, elements: any[]) => {
         const canvas = chartRef.current?.canvas;
-        if (canvas) {
-          // Cambiar cursor al pasar sobre spikes
-          if (elements.length > 0) {
-            const element = elements[0];
-            const clickedIndex = element.index;
-            const hasSpike = spikes.some((s) => s.index === clickedIndex);
-            canvas.style.cursor = hasSpike ? 'pointer' : 'default';
-          } else {
-            canvas.style.cursor = 'default';
-          }
+        if (!canvas) {
+          return;
         }
+
+        canvas.style.cursor = elements.length > 0 ? "pointer" : "default";
       },
       onClick: (_event: any, elements: any[]) => {
-        
-        if (elements.length > 0) {
-          const element = elements[0];
-          
-          // Buscar si el click fue en algún spike, sin importar el dataset
-          const clickedIndex = element.index;
-          const clickedSpike = spikes.find((s) => s.index === clickedIndex);
-          
-          if (clickedSpike && chartRef.current) {
-            const chartInstance = chartRef.current;
-            
-            // Intentar obtener la posición del punto en el dataset de spikes (dataset 1)
-            const spikeMeta = chartInstance.getDatasetMeta(1);
-            const spikePoint = spikeMeta.data[clickedIndex];
-            
-            if (spikePoint) {
-              const rect = chartInstance.canvas.getBoundingClientRect();
-              const rawX = rect.left + spikePoint.x;
-              const rawY = rect.top + spikePoint.y;
+        const chartInstance = chartRef.current;
 
-              const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 0;
-              const horizontalPadding = 16;
-              const effectivePopoverWidth = viewportWidth
-                ? Math.min(360, viewportWidth - horizontalPadding * 2)
-                : 360;
-              const minX = horizontalPadding + effectivePopoverWidth / 2;
-              const maxX = viewportWidth
-                ? viewportWidth - horizontalPadding - effectivePopoverWidth / 2
-                : rawX;
-
-              const clampedX = viewportWidth ? Math.min(Math.max(rawX, minX), maxX) : rawX;
-
-              const newPosition = {
-                x: clampedX,
-                y: rawY
-              };
-              setPopoverPosition(newPosition);
-              setHoveredSpike(clickedSpike);
-            } else {
-              console.warn('Could not find spike point in chart');
-            }
-          } else {
-            console.log('No spike found for this click or chartRef not ready');
-          }
-        } else {
-          console.log('No elements clicked');
+        if (!chartInstance) {
+          console.warn("El gráfico aún no está listo para recibir clicks");
+          return;
         }
+
+        if (elements.length === 0) {
+          setHoveredSpike(null);
+          setPopoverPosition(null);
+          return;
+        }
+
+        const [{ index: clickedIndex, datasetIndex }] = elements;
+        const pointData = data[clickedIndex];
+
+        if (!pointData) {
+          console.warn("No se encontró información de mercado para el punto clickeado");
+          return;
+        }
+
+        const existingSpike = spikes.find((s) => s.index === clickedIndex);
+        const cachedSummary = newsCacheRef.current[pointData.date];
+        const previousPoint = clickedIndex > 0 ? data[clickedIndex - 1] : null;
+        const computedChange = previousPoint && previousPoint.close !== 0
+          ? ((pointData.close - previousPoint.close) / previousPoint.close) * 100
+          : 0;
+
+        const nextSpike: PriceSpike = existingSpike
+          ? { ...existingSpike }
+          : {
+              date: pointData.date,
+              index: clickedIndex,
+              close: pointData.close,
+              changePercent: computedChange,
+              newsLoaded: Boolean(cachedSummary),
+              newsSummary: cachedSummary ?? null,
+              kind: "point"
+            };
+
+        const preferredDatasetIndex = existingSpike ? 1 : datasetIndex ?? 0;
+        let targetMeta = chartInstance.getDatasetMeta(preferredDatasetIndex);
+        let targetElement = targetMeta?.data?.[clickedIndex];
+
+        if (!targetElement && preferredDatasetIndex !== 0) {
+          targetMeta = chartInstance.getDatasetMeta(0);
+          targetElement = targetMeta?.data?.[clickedIndex];
+        }
+
+        if (!targetElement) {
+          console.warn("No se pudo determinar la posición del punto clickeado");
+          return;
+        }
+
+        const rect = chartInstance.canvas.getBoundingClientRect();
+        const rawX = rect.left + targetElement.x;
+        const rawY = rect.top + targetElement.y;
+
+        const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 0;
+        const horizontalPadding = 16;
+        const effectivePopoverWidth = viewportWidth
+          ? Math.min(360, viewportWidth - horizontalPadding * 2)
+          : 360;
+        const minX = horizontalPadding + effectivePopoverWidth / 2;
+        const maxX = viewportWidth
+          ? viewportWidth - horizontalPadding - effectivePopoverWidth / 2
+          : rawX;
+
+        const clampedX = viewportWidth ? Math.min(Math.max(rawX, minX), maxX) : rawX;
+
+        setPopoverPosition({ x: clampedX, y: rawY });
+        setHoveredSpike(nextSpike);
       },
       scales: {
         x: {
@@ -427,55 +449,72 @@ export default function StockExplorer() {
     if (spike.newsLoaded) {
       return;
     }
+
     try {
       const companyName = `Acciones ${symbol}`;
       const response = await fetch(
         `/api/news?query=${encodeURIComponent(companyName)}&date=${spike.date}&limit=5`
       );
+
       if (!response.ok) {
         console.warn(`No se pudieron obtener noticias para ${spike.date}`);
-        setSpikes((prev) =>
-          prev.map((s) =>
-            s.date === spike.date
-              ? { ...s, newsLoaded: true, newsSummary: "No se encontraron noticias para esta fecha." }
-              : s
-          )
-        );
-        setHoveredSpike((prev) => 
-          prev && prev.date === spike.date 
-            ? { ...prev, newsLoaded: true, newsSummary: "No se encontraron noticias para esta fecha." }
+        const fallbackMessage = "No se encontraron noticias para esta fecha.";
+
+        if (spike.kind === "spike") {
+          setSpikes((prev) =>
+            prev.map((s) =>
+              s.date === spike.date
+                ? { ...s, newsLoaded: true, newsSummary: fallbackMessage }
+                : s
+            )
+          );
+        }
+
+        newsCacheRef.current[spike.date] = fallbackMessage;
+
+        setHoveredSpike((prev) =>
+          prev && prev.date === spike.date
+            ? { ...prev, newsLoaded: true, newsSummary: fallbackMessage }
             : prev
         );
         return;
       }
 
       const payload = await response.json();
-      console.log('Payload received:', payload);
       const summary = payload.summary || "No hay resumen disponible.";
 
-      setSpikes((prev) =>
-        prev.map((s) =>
-          s.date === spike.date ? { ...s, newsLoaded: true, newsSummary: summary } : s
-        )
-      );
-      
-      setHoveredSpike((prev) => 
-        prev && prev.date === spike.date 
+      if (spike.kind === "spike") {
+        setSpikes((prev) =>
+          prev.map((s) =>
+            s.date === spike.date ? { ...s, newsLoaded: true, newsSummary: summary } : s
+          )
+        );
+      }
+
+      newsCacheRef.current[spike.date] = summary;
+
+      setHoveredSpike((prev) =>
+        prev && prev.date === spike.date
           ? { ...prev, newsLoaded: true, newsSummary: summary }
           : prev
       );
     } catch (error) {
       console.error("Error fetching news:", error);
-      setSpikes((prev) =>
-        prev.map((s) =>
-          s.date === spike.date
-            ? { ...s, newsLoaded: true, newsSummary: "Error al cargar las noticias." }
-            : s
-        )
-      );
-      setHoveredSpike((prev) => 
-        prev && prev.date === spike.date 
-          ? { ...prev, newsLoaded: true, newsSummary: "Error al cargar las noticias." }
+      const errorMessage = "Error al cargar las noticias.";
+
+      if (spike.kind === "spike") {
+        setSpikes((prev) =>
+          prev.map((s) =>
+            s.date === spike.date
+              ? { ...s, newsLoaded: true, newsSummary: errorMessage }
+              : s
+          )
+        );
+      }
+
+      setHoveredSpike((prev) =>
+        prev && prev.date === spike.date
+          ? { ...prev, newsLoaded: true, newsSummary: errorMessage }
           : prev
       );
     }
@@ -525,13 +564,27 @@ export default function StockExplorer() {
               ✕
             </button>
             <div className="spike-popover-header">
-              <h4>{hoveredSpike.date}</h4>
-              <span className={hoveredSpike.changePercent > 0 ? "change-positive" : "change-negative"}>
-                {hoveredSpike.changePercent > 0 ? "+" : ""}
-                {hoveredSpike.changePercent.toFixed(2)}%
+              <div className="spike-popover-title">
+                <h4>{hoveredSpike.date}</h4>
+                <small>{hoveredSpike.kind === "spike" ? "Pico significativo" : "Cierre diario"}</small>
+              </div>
+              <span
+                className={
+                  hoveredSpike.changePercent > 0
+                    ? "change-positive"
+                    : hoveredSpike.changePercent < 0
+                      ? "change-negative"
+                      : "change-neutral"
+                }
+              >
+                {hoveredSpike.changePercent > 0 ? "+" : hoveredSpike.changePercent < 0 ? "" : "±"}
+                {Math.abs(hoveredSpike.changePercent).toFixed(2)}%
               </span>
             </div>
             <div className="spike-popover-body">
+              <p className="price-detail">
+                Precio de cierre: <strong>${hoveredSpike.close.toFixed(2)}</strong>
+              </p>
               {!hoveredSpike.newsLoaded && <p className="loading-news">Cargando noticias...</p>}
               {hoveredSpike.newsLoaded && (
                 <p className="news-summary">{hoveredSpike.newsSummary || "Sin noticias disponibles."}</p>
