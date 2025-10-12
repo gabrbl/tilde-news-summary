@@ -156,69 +156,56 @@ export default function StockExplorer() {
   }, [fetchStockData, symbol, range]);
 
   const detectSpikes = useCallback((prices: StockDataPoint[]): PriceSpike[] => {
-    if (prices.length < 7) {
+    if (prices.length < 9) {
       return [];
     }
 
-    const MIN_WINDOW_RADIUS = 3;
-    const MAX_WINDOW_RADIUS = 4;
-    const Z_SCORE_THRESHOLD = 0.9;
-    const MIN_PERCENT_DISTANCE = 1.5;
-    const EPSILON = 1e-6;
+    // Usamos Fractales de Williams: un punto es pico/valle si es extremo local
+    // comparado con N períodos a cada lado
+    const LEFT_BARS = 4;
+    const RIGHT_BARS = 4;
+    const MIN_PROMINENCE_PERCENT = 2.0; // Mínimo 2% de diferencia con vecinos para ser significativo
 
-    const windowRadius = Math.min(
-      MAX_WINDOW_RADIUS,
-      Math.max(MIN_WINDOW_RADIUS, Math.floor(prices.length / 10) || MIN_WINDOW_RADIUS)
-    );
+    const detected: PriceSpike[] = [];
 
-    const candidates: { spike: PriceSpike; strength: number }[] = [];
-
-    for (let i = windowRadius; i < prices.length - windowRadius; i++) {
+    for (let i = LEFT_BARS; i < prices.length - RIGHT_BARS; i++) {
       const curr = prices[i];
-      const windowPoints = prices.slice(i - windowRadius, i + windowRadius + 1);
-      const closes = windowPoints.map((point) => point.close);
-      const centerClose = closes[windowRadius];
-
-      const maxClose = Math.max(...closes);
-      const minClose = Math.min(...closes);
-
-      const isPeak = centerClose >= maxClose - EPSILON;
-      const isValley = centerClose <= minClose + EPSILON;
+      
+      // Obtener barras a la izquierda y derecha
+      const leftBars = prices.slice(i - LEFT_BARS, i);
+      const rightBars = prices.slice(i + 1, i + RIGHT_BARS + 1);
+      
+      // Verificar si es un pico (fractal alcista)
+      const isPeak = leftBars.every((bar) => curr.close > bar.close) && 
+                     rightBars.every((bar) => curr.close > bar.close);
+      
+      // Verificar si es un valle (fractal bajista)
+      const isValley = leftBars.every((bar) => curr.close < bar.close) && 
+                       rightBars.every((bar) => curr.close < bar.close);
 
       if (!isPeak && !isValley) {
         continue;
       }
 
-      const sameValueCount = closes.filter((value) => Math.abs(value - centerClose) < EPSILON).length;
-      if (sameValueCount > 1) {
-        // Evita marcar mesetas planas como picos/vales.
-        continue;
-      }
-
-      const mean = closes.reduce((sum, value) => sum + value, 0) / closes.length;
-      const variance = closes.reduce((sum, value) => sum + (value - mean) ** 2, 0) / closes.length;
-      const stdDev = Math.sqrt(variance);
-
-      if (stdDev < EPSILON || Math.abs(mean) < EPSILON) {
-        continue;
-      }
-
-      const zScore = (centerClose - mean) / stdDev;
-      const percentDistance = ((centerClose - mean) / mean) * 100;
-
-      const passesPeak = isPeak && zScore >= Z_SCORE_THRESHOLD && percentDistance >= MIN_PERCENT_DISTANCE;
-      const passesValley = isValley && zScore <= -Z_SCORE_THRESHOLD && percentDistance <= -MIN_PERCENT_DISTANCE;
-
-      if (!passesPeak && !passesValley) {
-        continue;
-      }
-
-      const prev = prices[i - 1];
-      const changePercent = prev && prev.close !== 0
-        ? ((centerClose - prev.close) / prev.close) * 100
+      // Calcular prominencia: diferencia promedio con los vecinos
+      const allNeighbors = [...leftBars, ...rightBars];
+      const avgNeighbor = allNeighbors.reduce((sum, bar) => sum + bar.close, 0) / allNeighbors.length;
+      const prominencePercent = avgNeighbor !== 0 
+        ? Math.abs((curr.close - avgNeighbor) / avgNeighbor) * 100 
         : 0;
 
-      const newSpike: PriceSpike = {
+      // Filtrar por prominencia mínima
+      if (prominencePercent < MIN_PROMINENCE_PERCENT) {
+        continue;
+      }
+
+      // Calcular cambio porcentual respecto al día anterior
+      const prev = prices[i - 1];
+      const changePercent = prev && prev.close !== 0
+        ? ((curr.close - prev.close) / prev.close) * 100
+        : 0;
+
+      detected.push({
         date: curr.date,
         index: i,
         close: curr.close,
@@ -226,21 +213,10 @@ export default function StockExplorer() {
         newsLoaded: false,
         newsSummary: null,
         kind: isPeak ? "peak" : "valley"
-      };
-
-      const strength = Math.abs(zScore);
-      const lastCandidate = candidates[candidates.length - 1];
-
-      if (lastCandidate && i - lastCandidate.spike.index <= windowRadius) {
-        if (strength > lastCandidate.strength) {
-          candidates[candidates.length - 1] = { spike: newSpike, strength };
-        }
-      } else {
-        candidates.push({ spike: newSpike, strength });
-      }
+      });
     }
 
-    return candidates.map((entry) => entry.spike);
+    return detected;
   }, []);
 
   useEffect(() => {
