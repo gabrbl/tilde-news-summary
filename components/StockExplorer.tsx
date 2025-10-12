@@ -50,7 +50,7 @@ interface PriceSpike {
   changePercent: number;
   newsLoaded: boolean;
   newsSummary: string | null;
-  kind: "spike" | "point";
+  kind: "peak" | "valley" | "point";
 }
 
 type RangeOption = {
@@ -156,32 +156,91 @@ export default function StockExplorer() {
   }, [fetchStockData, symbol, range]);
 
   const detectSpikes = useCallback((prices: StockDataPoint[]): PriceSpike[] => {
-    if (prices.length < 2) {
+    if (prices.length < 7) {
       return [];
     }
 
-    const SPIKE_THRESHOLD = 5.0;
-    const detected: PriceSpike[] = [];
+    const MIN_WINDOW_RADIUS = 3;
+    const MAX_WINDOW_RADIUS = 4;
+    const Z_SCORE_THRESHOLD = 0.9;
+    const MIN_PERCENT_DISTANCE = 1.5;
+    const EPSILON = 1e-6;
 
-    for (let i = 1; i < prices.length; i++) {
-      const prev = prices[i - 1];
+    const windowRadius = Math.min(
+      MAX_WINDOW_RADIUS,
+      Math.max(MIN_WINDOW_RADIUS, Math.floor(prices.length / 10) || MIN_WINDOW_RADIUS)
+    );
+
+    const candidates: { spike: PriceSpike; strength: number }[] = [];
+
+    for (let i = windowRadius; i < prices.length - windowRadius; i++) {
       const curr = prices[i];
-      const changePercent = ((curr.close - prev.close) / prev.close) * 100;
+      const windowPoints = prices.slice(i - windowRadius, i + windowRadius + 1);
+      const closes = windowPoints.map((point) => point.close);
+      const centerClose = closes[windowRadius];
 
-      if (Math.abs(changePercent) >= SPIKE_THRESHOLD) {
-        detected.push({
-          date: curr.date,
-          index: i,
-          close: curr.close,
-          changePercent,
-          newsLoaded: false,
-          newsSummary: null,
-          kind: "spike"
-        });
+      const maxClose = Math.max(...closes);
+      const minClose = Math.min(...closes);
+
+      const isPeak = centerClose >= maxClose - EPSILON;
+      const isValley = centerClose <= minClose + EPSILON;
+
+      if (!isPeak && !isValley) {
+        continue;
+      }
+
+      const sameValueCount = closes.filter((value) => Math.abs(value - centerClose) < EPSILON).length;
+      if (sameValueCount > 1) {
+        // Evita marcar mesetas planas como picos/vales.
+        continue;
+      }
+
+      const mean = closes.reduce((sum, value) => sum + value, 0) / closes.length;
+      const variance = closes.reduce((sum, value) => sum + (value - mean) ** 2, 0) / closes.length;
+      const stdDev = Math.sqrt(variance);
+
+      if (stdDev < EPSILON || Math.abs(mean) < EPSILON) {
+        continue;
+      }
+
+      const zScore = (centerClose - mean) / stdDev;
+      const percentDistance = ((centerClose - mean) / mean) * 100;
+
+      const passesPeak = isPeak && zScore >= Z_SCORE_THRESHOLD && percentDistance >= MIN_PERCENT_DISTANCE;
+      const passesValley = isValley && zScore <= -Z_SCORE_THRESHOLD && percentDistance <= -MIN_PERCENT_DISTANCE;
+
+      if (!passesPeak && !passesValley) {
+        continue;
+      }
+
+      const prev = prices[i - 1];
+      const changePercent = prev && prev.close !== 0
+        ? ((centerClose - prev.close) / prev.close) * 100
+        : 0;
+
+      const newSpike: PriceSpike = {
+        date: curr.date,
+        index: i,
+        close: curr.close,
+        changePercent,
+        newsLoaded: false,
+        newsSummary: null,
+        kind: isPeak ? "peak" : "valley"
+      };
+
+      const strength = Math.abs(zScore);
+      const lastCandidate = candidates[candidates.length - 1];
+
+      if (lastCandidate && i - lastCandidate.spike.index <= windowRadius) {
+        if (strength > lastCandidate.strength) {
+          candidates[candidates.length - 1] = { spike: newSpike, strength };
+        }
+      } else {
+        candidates.push({ spike: newSpike, strength });
       }
     }
 
-    return detected;
+    return candidates.map((entry) => entry.spike);
   }, []);
 
   useEffect(() => {
@@ -214,7 +273,7 @@ export default function StockExplorer() {
           pointBorderWidth: 1
         },
         {
-          label: "Picos significativos",
+          label: "Picos y valles pronunciados",
           data: data.map((point, idx) => (spikeIndices.has(idx) ? point.close : null)),
           borderColor: "#dc2626",
           backgroundColor: "rgba(220, 38, 38, 0.85)",
@@ -394,7 +453,9 @@ export default function StockExplorer() {
               if (datasetIndex === 1 && price !== null) {
                 const spike = spikes.find((s) => s.index === dataIndex);
                 if (spike) {
+                  const typeLabel = spike.kind === "peak" ? "📈 Pico pronunciado" : "📉 Valle pronunciado";
                   return [
+                    typeLabel,
                     `Cierre: $${price.toFixed(2)}`,
                     `Variación: ${spike.changePercent > 0 ? '+' : ''}${spike.changePercent.toFixed(2)}%`,
                     '⚠️ Click para ver noticias del día'
@@ -460,7 +521,7 @@ export default function StockExplorer() {
         console.warn(`No se pudieron obtener noticias para ${spike.date}`);
         const fallbackMessage = "No se encontraron noticias para esta fecha.";
 
-        if (spike.kind === "spike") {
+        if (spike.kind !== "point") {
           setSpikes((prev) =>
             prev.map((s) =>
               s.date === spike.date
@@ -483,7 +544,7 @@ export default function StockExplorer() {
       const payload = await response.json();
       const summary = payload.summary || "No hay resumen disponible.";
 
-      if (spike.kind === "spike") {
+      if (spike.kind !== "point") {
         setSpikes((prev) =>
           prev.map((s) =>
             s.date === spike.date ? { ...s, newsLoaded: true, newsSummary: summary } : s
@@ -502,7 +563,7 @@ export default function StockExplorer() {
       console.error("Error fetching news:", error);
       const errorMessage = "Error al cargar las noticias.";
 
-      if (spike.kind === "spike") {
+      if (spike.kind !== "point") {
         setSpikes((prev) =>
           prev.map((s) =>
             s.date === spike.date
@@ -566,7 +627,13 @@ export default function StockExplorer() {
             <div className="spike-popover-header">
               <div className="spike-popover-title">
                 <h4>{hoveredSpike.date}</h4>
-                <small>{hoveredSpike.kind === "spike" ? "Pico significativo" : "Cierre diario"}</small>
+                <small>
+                  {hoveredSpike.kind === "peak"
+                    ? "Pico pronunciado"
+                    : hoveredSpike.kind === "valley"
+                      ? "Valle pronunciado"
+                      : "Cierre diario"}
+                </small>
               </div>
               <span
                 className={
